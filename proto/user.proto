@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package user;
+
+// Public API, called by clients.
+//   Register / Login       -> no auth, return a JWT
+//   GetProfile / Ask       -> need metadata "authorization: Bearer <token>"
+// Internal API, called by llm-service only.
+//   GetUser                -> needs metadata "x-internal-token: <INTERNAL_TOKEN>"
+service UserService {
+  rpc Register (RegisterRequest) returns (AuthResponse);
+  rpc Login (LoginRequest) returns (AuthResponse);
+  rpc GetProfile (Empty) returns (User);
+
+  // Server streaming: the answer comes back in chunks as the LLM generates it.
+  rpc Ask (AskRequest) returns (stream AskChunk);
+
+  rpc GetUser (GetUserRequest) returns (User);
+}
+
+message Empty {}
+
+message RegisterRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+  int32 age = 4;
+  string city = 5;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;
+  User user = 2;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message AskRequest {
+  string question = 1;
+}
+
+message AskChunk {
+  string text = 1;
+}
+
+message Order {
+  string id = 1;
+  string item = 2;
+  double amount = 3;
+  string status = 4;
+  string created_at = 5;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  int32 age = 4;
+  string city = 5;
+  string plan = 6;
+  repeated Order orders = 7;
+}

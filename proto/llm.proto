@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package llm;
+
+// Internal service, called by user-service only.
+// Needs metadata "x-internal-token: <INTERNAL_TOKEN>".
+service LlmService {
+  // Server streaming: answer text is streamed back as the model generates it.
+  rpc Ask (AskRequest) returns (stream AskChunk);
+}
+
+message AskRequest {
+  // Already authenticated by user-service; the LLM can only read this user's data.
+  string user_id = 1;
+  string question = 2;
+}
+
+message AskChunk {
+  string text = 1;
+}
