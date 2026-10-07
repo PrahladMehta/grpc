@@ -1,70 +1,89 @@
-# gRPC user service + LLM service (Node, PostgreSQL, Gemini)
+# gRPC + LLM Demo
+
+Users sign up, log in, and ask questions about their own account. An AI (Gemini) answers, and the answer streams back word by word.
+
+## How it works
 
 ```
-client (cli.js)
-   │  gRPC  Register / Login  ──▶ JWT
-   │  gRPC  Ask + "authorization: Bearer <jwt>"
-   ▼
-user-service :50051 ── PostgreSQL (users, orders)
-   │  checks the JWT, then
-   │  gRPC  LlmService.Ask(user_id, question)   + x-internal-token
-   ▼
-llm-service :50052 ── LangChain agent ── Gemini
-   │  tool get_my_account
-   │  gRPC  UserService.GetUser(user_id)        + x-internal-token
-   └──────────────▶ user-service
-
-The answer streams back the same way (server streaming): Gemini → llm-service → user-service → client.
+client  ──▶  user-service  ──▶  llm-service  ──▶  Gemini
+                 │                   │
+             PostgreSQL       reads your data from user-service
 ```
 
-- **user-service** owns users, auth and the database. `Register`/`Login` hash passwords with bcrypt and return a 1-hour JWT. `GetProfile` and `Ask` need that JWT.
-- **llm-service** is internal. Its only tool reads the *authenticated* user's own account, so a user can't ask about anyone else.
-- Service-to-service calls (`LlmService.Ask`, `UserService.GetUser`) need a shared `INTERNAL_TOKEN`, so clients can't call them directly.
+- **user-service** handles sign-up, login (JWT) and the database.
+- **llm-service** asks Gemini and streams the answer back.
+- All services talk to each other over **gRPC**.
+
+## Requirements
+
+- Node.js 22+
+- Docker
+- A Gemini API key from [aistudio.google.com](https://aistudio.google.com)
 
 ## Setup
 
-1. Start PostgreSQL in Docker (port 5433, so it doesn't clash with a local install):
+**1. Start the database**
 
 ```bash
-docker run -d --name upa-postgres --restart unless-stopped \
-  -e POSTGRES_USER=upa -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=upa_grpc \
-  -p 127.0.0.1:5433:5432 -v upa-postgres-data:/var/lib/postgresql postgres:18-alpine
+docker run -d --name upa-postgres -e POSTGRES_USER=upa -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=upa_grpc -p 5433:5432 postgres:18-alpine
 ```
 
-   and set `DATABASE_URL=postgres://upa:<password>@localhost:5433/upa_grpc` in `user-service/.env`.
-2. Install and create the tables and demo users:
+**2. Add your settings**
+
+Copy `.env.example` to `.env` in both `user-service` and `llm-service`, then fill them in:
+
+`user-service/.env`
+
+```
+DATABASE_URL=postgres://upa:secret@localhost:5433/upa_grpc
+JWT_SECRET=any-long-random-text
+INTERNAL_TOKEN=another-long-random-text
+LLM_SERVICE_ADDR=localhost:50052
+```
+
+`llm-service/.env`
+
+```
+GOOGLE_API_KEY=your-gemini-key
+INTERNAL_TOKEN=another-long-random-text
+USER_SERVICE_ADDR=localhost:50051
+```
+
+`INTERNAL_TOKEN` must be the same in both files.
+
+**3. Install and create the tables**
 
 ```bash
-cd user-service && npm install && npm run db:setup   # tables + demo users
+cd user-service && npm install && npm run db:setup
 cd ../llm-service && npm install
 cd ../client && npm install
 ```
 
-## Run (two terminals)
+## Run
+
+Open two terminals:
 
 ```bash
-cd user-service && npm start     # :50051
-cd llm-service && npm start      # :50052
+cd user-service && npm start
 ```
 
-## Use
+```bash
+cd llm-service && npm start
+```
+
+## Try it
 
 ```bash
 cd client
-node cli.js register "Neha Gupta" neha@example.com supersecret1 29 Pune
-node cli.js login aarav@example.com password123        # demo user
-node cli.js me
-node cli.js ask "What did I order and what is still not delivered?"
+node cli.js login aarav@example.com password123
+node cli.js ask "What did I order?"
 ```
 
-Demo users (password `password123`): `aarav@example.com`, `priya@example.com`, `rohan@example.com`.
+Other commands:
 
-## Env vars
+```bash
+node cli.js register "Your Name" you@example.com yourpassword
+node cli.js me
+```
 
-| Service | Variable | Default |
-|---|---|---|
-| user-service | `DATABASE_URL`, `JWT_SECRET`, `INTERNAL_TOKEN` | required |
-| user-service | `USER_SERVICE_PORT`, `LLM_SERVICE_ADDR` | 50051, localhost:50052 |
-| llm-service | `GOOGLE_API_KEY`, `INTERNAL_TOKEN` | required |
-| llm-service | `LLM_SERVICE_PORT`, `USER_SERVICE_ADDR`, `GEMINI_MODEL` | 50052, localhost:50051, gemini-3.8-flash (this machine's .env uses gemini-3.5-flash-lite) |
-| client | `USER_SERVICE_ADDR` | localhost:50051 |
+Demo users (password `password123`): `aarav@example.com`, `priya@example.com`, `rohan@example.com`
