@@ -1,15 +1,17 @@
 {
-  "name": "user-service",
+  "name": "@upa/user-service",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
     "db:setup": "node --env-file-if-exists=.env setup-db.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
-    "@grpc/proto-loader": "^0.7.13",
+    "@upa/proto": "*",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.1"

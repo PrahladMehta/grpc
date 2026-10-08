@@ -1,27 +1,14 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import grpc from "@grpc/grpc-js";
-import protoLoader from "@grpc/proto-loader";
+import { loadProto } from "@upa/proto";
 import bcrypt from "bcryptjs";
 import { pool, createUser, findUserRowByEmail, getUserWithOrders, toUser } from "./db.js";
 import { signToken, requireUser, requireInternal, internalMetadata } from "./auth.js";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.USER_SERVICE_PORT || "50051";
 const LLM_SERVICE_ADDR = process.env.LLM_SERVICE_ADDR || "localhost:50052";
 
-const loadProto = (file) =>
-  grpc.loadPackageDefinition(
-    protoLoader.loadSync(path.join(here, "..", "proto", file), {
-      keepCase: true,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true,
-    }),
-  );
-const { user: userProto } = loadProto("user.proto");
-const { llm: llmProto } = loadProto("llm.proto");
+const userProto = loadProto("user");
+const llmProto = loadProto("llm");
 
 const llmClient = new llmProto.LlmService(LLM_SERVICE_ADDR, grpc.credentials.createInsecure());
 

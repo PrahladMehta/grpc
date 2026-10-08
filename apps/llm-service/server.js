@@ -1,14 +1,11 @@
-import path from "node:path";
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
 import grpc from "@grpc/grpc-js";
-import protoLoader from "@grpc/proto-loader";
+import { loadProto } from "@upa/proto";
 import { createAgent, tool } from "langchain";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import * as z from "zod";
 import { getUser } from "./userClient.js";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.LLM_SERVICE_PORT || "50052";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const { INTERNAL_TOKEN } = process.env;
@@ -18,15 +15,7 @@ if (!INTERNAL_TOKEN) {
   process.exit(1);
 }
 
-const { llm: llmProto } = grpc.loadPackageDefinition(
-  protoLoader.loadSync(path.join(here, "..", "proto", "llm.proto"), {
-    keepCase: true,
-    longs: String,
-    enums: String,
-    defaults: true,
-    oneofs: true,
-  }),
-);
+const llmProto = loadProto("llm");
 
 // The tool takes no ID argument: it always reads the authenticated user's own data
 // (passed via config), so a prompt can't make the model fetch someone else's account.
@@ -58,6 +47,7 @@ function getAgent() {
       "You are an assistant for a signed-in user. Answer questions about their account and orders. " +
       "Look the data up with get_my_account rather than guessing. You only have access to this user's data; " +
       "if they ask about other users, say you can't share that. If the data doesn't contain the answer, say so. " +
+      "Order amounts are in Indian rupees, exactly as stored (4599 means ₹4,599). " +
       "Keep answers short and direct.",
   });
   return agent;

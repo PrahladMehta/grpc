@@ -14,6 +14,19 @@ client  ──▶  user-service  ──▶  llm-service  ──▶  Gemini
 - **llm-service** asks Gemini and streams the answer back.
 - All services talk to each other over **gRPC**.
 
+## Project structure
+
+A [Turborepo](https://turborepo.dev) monorepo:
+
+```
+apps/
+  user-service/   gRPC server: auth + database
+  llm-service/    gRPC server: Gemini via LangChain
+  client/         command-line client
+packages/
+  proto/          shared .proto files, used by all apps
+```
+
 ## Requirements
 
 - Node.js 22+
@@ -30,9 +43,9 @@ docker run -d --name upa-postgres -e POSTGRES_USER=upa -e POSTGRES_PASSWORD=secr
 
 **2. Add your settings**
 
-Copy `.env.example` to `.env` in both `user-service` and `llm-service`, then fill them in:
+Copy `.env.example` to `.env` in both `apps/user-service` and `apps/llm-service`, then fill them in:
 
-`user-service/.env`
+`apps/user-service/.env`
 
 ```
 DATABASE_URL=postgres://upa:secret@localhost:5433/upa_grpc
@@ -41,7 +54,7 @@ INTERNAL_TOKEN=another-long-random-text
 LLM_SERVICE_ADDR=localhost:50052
 ```
 
-`llm-service/.env`
+`apps/llm-service/.env`
 
 ```
 GOOGLE_API_KEY=your-gemini-key
@@ -54,35 +67,56 @@ USER_SERVICE_ADDR=localhost:50051
 **3. Install and create the tables**
 
 ```bash
-cd user-service && npm install && npm run db:setup
-cd ../llm-service && npm install
-cd ../client && npm install
+npm install
+npm run db:setup
 ```
 
 ## Run
 
-Open two terminals:
+Start both services with one command:
 
 ```bash
-cd user-service && npm start
+npm run dev
 ```
 
-```bash
-cd llm-service && npm start
-```
+They restart automatically when you change the code.
 
 ## Try it
 
+In a second terminal:
+
 ```bash
-cd client
-node cli.js login aarav@example.com password123
-node cli.js ask "What did I order?"
+npm run client
 ```
 
-Other commands:
+This opens an interactive session. Log in, then type questions:
+
+```
+guest> login
+Email: aarav@example.com
+Password: ***********
+Logged in as Aarav Sharma.
+Aarav> What did I order?
+You ordered a Wireless Mouse and a Mechanical Keyboard...
+```
+
+| Command | What it does |
+|---|---|
+| `login` | Log in |
+| `register` | Create an account |
+| `me` | Show your profile and orders |
+| `logout` | Log out |
+| `help` | Show all commands |
+| `exit` | Quit |
+
+Anything else you type is sent to the AI as a question. Press `Ctrl+C` to stop an answer midway.
+
+You can also run single commands:
 
 ```bash
-node cli.js register "Your Name" you@example.com yourpassword
+cd apps/client
+node cli.js login aarav@example.com password123
+node cli.js ask "What did I order?"
 node cli.js me
 ```
 
